@@ -1,100 +1,51 @@
-# feeds.py
 import time
 import requests
-import logging
 from bs4 import BeautifulSoup
 
-logger = logging.getLogger("feeds")
-logger.setLevel(logging.INFO)
-
 def fetch_pump():
+    url = "https://pump.fun/api/trending"  # 修正后的API路径
     out = []
     try:
-        r = requests.get("https://pump.fun/api/trending", timeout=10)
-        r.raise_for_status()
-        data = r.json()
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
         for item in data:
+            name = item.get("tokenName") or item.get("name", "")
+            score = item.get("score", 0)
             out.append({
-                "symbol": item["symbol"],
-                "name":   item.get("name", item["symbol"]),
-                "pump_score": item.get("score", 0),
-                "timestamp":  item.get("timestamp", int(time.time()))
+                "symbol": name,
+                "name": name,
+                "pump_score": score,
+                "timestamp": int(time.time())
             })
-        logger.info(f"[Pump] fetched {len(out)} items")
     except Exception as e:
-        logger.warning(f"[Pump] fetch error: {e}")
+        print(f"[Pump] fetch error: {e}")
     return out
 
 def fetch_dex():
+    url = "https://api.dexscreener.com/latest/dex/pairs/solana"
     out = []
     try:
-        url = "https://api.dexscreener.io/latest/dex/pairs/solana"
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
-        pairs = r.json().get("pairs", [])
-        for p in pairs:
+        resp = requests.get(url, timeout=10)
+        data = resp.json().get("pairs", [])
+        for p in data:
             base = p.get("baseToken", {})
             out.append({
-                "symbol":       base.get("symbol", ""),
-                "name":         base.get("name", base.get("symbol", "")),
-                "dex_liquidity": p.get("liquidity", {}).get("usd", 0),
-                "dex_marketcap": p.get("fdv", 0),
-                "dex_boosts":    p.get("boosts", 0),
-                "timestamp":     int(time.time())
+                "symbol": base.get("symbol", ""),
+                "name": base.get("name", ""),
+                "dex_liquidity": p.get("liquidity", {}).get("usd", ""),
+                "dex_marketcap": p.get("fdv", ""),
+                "dex_boosts": p.get("boosts", 0),
+                "timestamp": int(time.time())
             })
-        logger.info(f"[Dex] fetched {len(out)} items")
     except Exception as e:
-        logger.warning(f"[Dex] fetch error: {e}")
-    return out
-
-def fetch_axiom():
-    out = []
-    try:
-        r = requests.get("https://public-api.axiom.trade/solana/recent", timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        for item in data:
-            out.append({
-                "symbol":       item.get("symbol",""),
-                "name":         item.get("name",""),
-                "axiom_score":  item.get("score",0),
-                "timestamp":    int(time.time())
-            })
-        logger.info(f"[Axiom] fetched {len(out)} items")
-    except Exception as e:
-        logger.warning(f"[Axiom] fetch error: {e}")
-    return out
-
-def fetch_gagn():
-    out = []
-    try:
-        r = requests.get("https://api.gagn.ai/solana/metrics", timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        for item in data:
-            out.append({
-                "symbol":      item.get("symbol",""),
-                "name":        item.get("name",""),
-                "top10_ratio": item.get("top10_pct",""),
-                "no_owner":    item.get("no_rug", False),
-                "burned":      item.get("burned", False),
-                "frozen":      item.get("no_freeze", False),
-                "timestamp":   int(time.time())
-            })
-        logger.info(f"[GAGN] fetched {len(out)} items")
-    except Exception as e:
-        logger.warning(f"[GAGN] fetch error: {e}")
+        print(f"[Dex] fetch error: {e}")
     return out
 
 def get_all_data():
     merged = {}
-    for fn in (fetch_pump, fetch_dex, fetch_axiom, fetch_gagn):
-        for item in fn():
+    for fetch in (fetch_pump, fetch_dex):
+        for item in fetch():
             sym = item.get("symbol")
-            if not sym:
-                continue
-            # 同一个 symbol 的字段累加到一个 dict
+            if not sym: continue
             merged.setdefault(sym, {}).update(item)
-    result = list(merged.values())
-    logger.info(f"[Aggregator] returning {len(result)} total items")
-    return result
+    return list(merged.values())
