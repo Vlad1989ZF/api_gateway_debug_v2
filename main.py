@@ -1,5 +1,5 @@
-from feeds import get_all_data
 from fastapi import FastAPI
+from feeds import get_all_data
 import uvicorn
 
 app = FastAPI()
